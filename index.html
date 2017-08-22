@@ -4,17 +4,104 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Bootstrap 101 Template</title>
+    <title>Andromeda : A Text Translation Environment</title>
     <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/andromeda.min.css" rel="stylesheet">
     <!--[if lt IE 9]>
       <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
       <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
     <![endif]-->
   </head>
-  <body>
+  <body id="body" class="container-fluid">
+    <!-- Holds all the content -->
+    <div id="contentRow" class="row">
 
-    <script src="js/lib/jquery-3.2.1.js"></script>
-    <script src="js/lib/bootstrap.min.js"></script>
-    <script src="js/andromeda.min.js"></script>
+      <!-- Holds the left column: dictionary and notes -->
+      <div id="leftColumn" class="col-sm-4">
+
+        <!-- The dictionary module -->
+        <div id="dictionaryCell" class="col-sm-12 cell">
+            <div id="dictionaryHeader" class="col-sm-12 header greyed-out">Dictionary</div>
+            <div id="dictionaryContent" class="greyed-out">
+              <br>
+              <h3>No Dictionary</h3>
+              <p>There are no word queries to display. To fix this you can do one of two things:</p>
+              <ol>
+                <li>Load a text from Perseus using the text query in the middle column.</li>
+                <li>Load a saved Text Translation Enviroment (.tte) file from disk to restore a previous session.</li>
+              </ol>
+            </div>
+        </div>
+
+        <!-- The note module -->
+        <div id="noteCell" class="col-sm-12 cell">
+            <div id="noteHeader" class="col-sm-12 header greyed-out">Notes</div>
+            <div id="noteContent" class="greyed-out">
+              <br>
+              <h3>No Notes</h3>
+              <p>There are currently no notes to display. To fix this you can do one of two things:</p>
+              <ol>
+                <li>Load a text from Perseus using the text query in the middle column.</li>
+                <li>Load a saved Text Translation Enviroment (.tte) file from disk to restore a previous session.</li>
+              </ol>
+            </div>
+        </div>
+      </div>
+
+      <!-- The middle column holds the translation -->
+      <div id="middleColumn" class="col-sm-4">
+
+          <!-- The text module -->
+          <div id="textCell" class="col-sm-12 cell">
+              <div id="textHeader" class="col-sm-12 header ">Text</div>
+            <div id="textContent">
+              <br>
+              <h3>Let's Get Started!</h3>
+              <p>As you can see no text is loaded right now. There are two possible solutions to  this <em>horrible</em> problem:</p>
+
+              <h4>1. Load A Text From Perseus</h4>
+              <p>Using the inputfield below you can query the perseus text database to load a text.<br>You can enter either the
+              official Perseus Name <em>(Catul. 1)</em> or you can enter the URL pointing to the text page. The translation will be
+              automatically loaded for that specific fragment.
+              </p>
+              <input id="loadFromPerseusQuery" type="text" class="form-control" placeholder="Enter a name or a URL and press 'Load from Perseus'">
+              <input id="loadFromPerseusButton" type="submit" class="btn btn-block btn-primary" value="Load from Perseus">
+              <br>
+
+              <h4>2. Load A Saved Text Translation Environment File</h4>
+              <p>If you've worked with this website before and you've remembered to save your work you can restore a previous
+              session by loading the generated Text Translation Environment (<code>.tte</code>) file.
+              <br>Use the button below to choose a file from your disk to load.</p>
+              <p class="text-danger"><b>Warning: </b>Saving to and restoring from file is still an experimental feature and should be
+              used with caution!</p>
+              <input type="file" class="form-control">
+            </div>
+          </div>
+      </div>
+
+      <!-- The right column holds the translation -->
+      <div id="rightColumn" class="col-sm-4">
+
+        <!-- The translation module -->
+        <div id="translationCell" class="col-sm-12 cell">
+            <div id="translationHeader" class="col-sm-12 header greyed-out">Translation</div>
+            <div id="translationContent" class="greyed-out">
+              <br>
+              <h3>No Translation</h3>
+              <p>There is currently no translation to display. To fix this you can do one of two things:</p>
+              <ol>
+                <li>Load a text from Perseus using the text query in the middle column.</li>
+                <li>Load a saved Text Translation Enviroment (.tte) file from disk to restore a previous session.</li>
+              </ol>
+            </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="loaderDiv" class="hidden" style="display:none"></div>
+
+    <!-- All script includes -->
+    <script src="js/lib/jquery-3.2.1.min.js"></script>
+    <script src="js/andromeda.js"></script>
   </body>
 </html>
