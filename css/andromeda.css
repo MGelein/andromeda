@@ -80,6 +80,14 @@ body{
   font-weight: lighter;
 }
 
+.textNav{
+  cursor: pointer;
+  border: 1px solid #777;
+  border-radius: 0.5vh;
+  padding-left: 0.5vh;
+  padding-right: 0.5vh;
+}
+
 /**
  * ID's
  */

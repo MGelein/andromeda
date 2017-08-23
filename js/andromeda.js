@@ -18,6 +18,14 @@ var andromeda = {
   var MORPH_URL = "http://www.perseus.tufts.edu/hopper/";
   var DICT_CACHE_SIZE = 10;
 
+  //contains the HTML for the text dropdown. Just saved in a variable to not pollute the code
+  var textDropdownHTML = "<div class='row'><hr>"
+  + "<div class='col-sm-12 text-center'><h4>Navigation</h4></div>"
+  + "<div class='col-sm-6 text-center'><span id='prevSeg' class='textNav'>◀&nbsp;Previous&nbsp;Segment</span></div>"
+  + "<div class='col-sm-6 text-center'><span id='nextSeg' class='textNav'>&nbsp;Next&nbsp;Segment&nbsp;▶</span></div><hr>"
+  + "<div class='col-sm-12 text-center'><h4>Save &amp; Load</h4></div>"
+  + "</div>";
+
   /**
    * This function is called by the 'Load From Perseus Button'
    */
@@ -47,7 +55,9 @@ var andromeda = {
           }, 2000);
         }else{
           //remove image links to prevent them from generating errors
-          result = result.replace(/<img[^>]*>/g,"");
+          //result = result.replace(/<img[^>]*>/g,"");
+          //Instead of removing, replace all img with span to prevent the src from firing
+          result = result.replace(/<img src=/g , '<span src=');
           var jResult = $(result)
 
           //get a link to the current page from the result and save it in the global andromeda environment object
@@ -55,6 +65,11 @@ var andromeda = {
           _a.environment.text.doc = TEXT_LOAD_URL + $(currentLink).attr('href');
           _a.environment.text.name = $(currentLink).attr('title');
           _a.environment.text.title = $(jResult.find('#header_text').get(0)).find('h1').get(0).textContent;
+          //get the prev and next segment
+          var nextArrow = jResult.find('.arrow span[alt="next"]').get(0);
+          var prevArrow = jResult.find('.arrow span[alt="previous"]').get(0);
+          if(nextArrow != undefined) _a.environment.text.next = $(nextArrow).parent().attr('href');
+          if(prevArrow != undefined) _a.environment.text.prev = $(prevArrow).parent().attr('href');
           loadText();
 
           //try to find all the translations
@@ -180,6 +195,35 @@ var andromeda = {
 
       //overwrite the default <a> behaviour
       registerWordHandlers();
+
+      _a.environment.text.dropdown = textDropdownHTML;
+
+      //Create the textHeader handler
+      $('#textHeader').unbind('click').click(function(event){
+        event.stopPropagation();
+        var headerDropdown = $('#headerDropdown')
+        if(!_a.ui.dropdownShowing){
+          _a.ui.dropdownShowing = true;
+          var positionDropdown = function(){
+            var textHeader = $('#textHeader');
+            var offset = textHeader.offset();
+            headerDropdown.offset({top: 0, left: 0});
+            headerDropdown.html(_a.environment.text.dropdown);
+            headerDropdown.offset({top: offset.top + textHeader.height() , left: offset.left});
+            headerDropdown.innerWidth(textHeader.outerWidth());
+          }
+          positionDropdown();
+          //reposition on resize
+          $(window).unbind('resize').resize(positionDropdown);
+          //hide on click anywhere outside of the headerDropdown
+          $(document).click(function(){hideDropdown();});
+
+          //finally fade in the dropdown menu
+          headerDropdown.fadeIn();
+        }else{
+          hideDropdown();
+        }
+      });
     }});
   }
 
@@ -375,10 +419,10 @@ var andromeda = {
     });
 
     $('#loadFromPerseusQuery').keydown(function(e){
-    if(e.keyCode == 13){
-      searchPerseus();
-    }
-});
+        if(e.keyCode == 13){
+          searchPerseus();
+        }
+    });
   }
 
   _a.search = {
