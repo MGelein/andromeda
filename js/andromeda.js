@@ -21,13 +21,14 @@ var andromeda = {
   //contains the HTML for the text dropdown. Just saved in a variable to not pollute the code
   var textDropdownHTML = "<div class='row'><hr>"
   + "<div class='col-sm-12 text-center'><h4>Navigation</h4></div>"
-  + "<div class='col-sm-6 text-center'><span id='prevSeg' class='textNav'>◀&nbsp;Previous&nbsp;Segment</span></div>"
-  + "<div class='col-sm-6 text-center'><span id='nextSeg' class='textNav'>&nbsp;Next&nbsp;Segment&nbsp;▶</span></div><hr>"
+  + "<div class='col-sm-6 text-center'><span id='prevSeg' class='greyed-out'>◀&nbsp;Previous Segment</span></div>"
+  + "<div class='col-sm-6 text-center'><span id='nextSeg' class='greyed-out'>&nbsp;Next Segment&nbsp;▶</span></div><hr>"
   + "<div class='col-sm-12 text-center'><h4>Save &amp; Load</h4></div>"
   + "</div>";
 
   /**
    * This function is called by the 'Load From Perseus Button'
+   * It parses the UI query box and does some input sanitizing
    */
   var searchPerseus = function(){
     //load the query from the UI and check its length
@@ -45,6 +46,25 @@ var andromeda = {
       perseusUrl = SEARCH_URL +  encodeURI(query);
     }
 
+    startLoadingText(perseusUrl);
+  }
+
+  /**
+   * Starts the actual loading of a valid perseus url. Either points to a search result, or
+   * to an actual text page. This parses the pages and points the loading of the data to the right
+   * urls
+   */
+  var startLoadingText = function(perseusUrl){
+    //set the dictionary and notes to ask the user to start doing something
+    var dictionaryNotUsed = "<br><h3>No Dictionary</h3><p>There are no word queries to display. To get started using the dictionary click a word in the main text in the middle column.</p>";
+    var notesNotUsed = "<br><h3>No Notes</h3><p>There are no notes to display. To get started taking notes make a selection in the main text in the middle column and press the 'Add Note' button.</p>";
+    $('#dictionaryContent').html(dictionaryNotUsed);
+    $('#noteContent').html(notesNotUsed);
+
+    //reset the environment variables
+    _a.environment.translations = [];
+    _a.environment.text = {};
+
     //Start the asynchronous request
     $.ajax({url: perseusUrl, success: function(result){
         //If the entered query was ambiguous or not a perseus URL
@@ -57,19 +77,29 @@ var andromeda = {
           //remove image links to prevent them from generating errors
           //result = result.replace(/<img[^>]*>/g,"");
           //Instead of removing, replace all img with span to prevent the src from firing
-          result = result.replace(/<img src=/g , '<span src=');
-          var jResult = $(result)
+          result = result.replace(/<img/g, '<span');
+          var jResult = $(result);
 
           //get a link to the current page from the result and save it in the global andromeda environment object
-          var currentLink = jResult.find('.current').get(0);
+          var currentLink = jResult.find('.current').filter(':last').get(0);
           _a.environment.text.doc = TEXT_LOAD_URL + $(currentLink).attr('href');
           _a.environment.text.name = $(currentLink).attr('title');
+          _a.environment.text.section = $(jResult.find('.current').get(0)).attr('title');
           _a.environment.text.title = $(jResult.find('#header_text').get(0)).find('h1').get(0).textContent;
           //get the prev and next segment
           var nextArrow = jResult.find('.arrow span[alt="next"]').get(0);
           var prevArrow = jResult.find('.arrow span[alt="previous"]').get(0);
-          if(nextArrow != undefined) _a.environment.text.next = $(nextArrow).parent().attr('href');
-          if(prevArrow != undefined) _a.environment.text.prev = $(prevArrow).parent().attr('href');
+          //save the url ref to the next and prev segment
+          if(nextArrow != undefined){
+             _a.environment.text.next = MORPH_URL + $(nextArrow).parent().attr('href');
+          }else{
+             _a.environment.text.next = undefined;
+          }
+          if(prevArrow != undefined){
+            _a.environment.text.prev = MORPH_URL + $(prevArrow).parent().attr('href');
+          }else{
+            _a.environment.text.prev = undefined;
+          }
           loadText();
 
           //try to find all the translations
@@ -86,7 +116,9 @@ var andromeda = {
           }
           loadTranslations();
         }
-        removeGreyOut();
+        //remove all the greyed-out classes
+        $('.greyed-out').removeClass('greyed-out');
+        hideDropdown();
     }});
   };
 
@@ -218,6 +250,26 @@ var andromeda = {
           //hide on click anywhere outside of the headerDropdown
           $(document).click(function(){hideDropdown();});
 
+          //add the next and prev segment handlers
+          if(_a.environment.text.next != undefined){
+            var nextSeg = $(headerDropdown.find('#nextSeg').get(0));
+            nextSeg.addClass('textNav').removeClass('greyed-out');
+            nextSeg.unbind('click').click(function(event){
+              event.stopPropagation();
+              nextSeg.html('Loading...');
+              startLoadingText(_a.environment.text.next);
+            });
+          }
+          if(_a.environment.text.prev != undefined){
+            var prevSeg = $(headerDropdown.find('#prevSeg').get(0));
+            prevSeg.addClass('textNav').removeClass('greyed-out');
+            prevSeg.unbind('click').click(function(event){
+              event.stopPropagation();
+              prevSeg.html('Loading...');
+              startLoadingText(_a.environment.text.prev);
+            });
+          }
+
           //finally fade in the dropdown menu
           headerDropdown.fadeIn();
         }else{
@@ -230,15 +282,15 @@ var andromeda = {
   /**
    * Just loads the word
    */
-  var loadWord = function(html, title){
-    $('#dictionaryHeader').html('Dictionary: ' + title);
+  var loadWord = function(html, title, locus){
+    $('#dictionaryHeader').html('Dictionary: ' + title + ' <span class="locus">' + locus + '</span>');
     $('#dictionaryContent').html(html);
   }
 
   /**
    * Loads a dictionary definition from perseus dictionary
    */
-  var loadDictionaryPerseus = function(url, title){
+  var loadDictionaryPerseus = function(url, title, locus){
     //construct the link
     var morphUrl = MORPH_URL + url;
 
@@ -246,7 +298,7 @@ var andromeda = {
     var cached = false;
     $.each(_a.environment.dictionary.cache, function(index, word){
       if(word.wordUrl == morphUrl){
-         loadWord(word.data, word.wordTitle);
+         loadWord(word.data, word.wordTitle, word.loc);
          cached = true;
        }
     });
@@ -277,17 +329,20 @@ var andromeda = {
         var id = $(value).attr('id');
         $(value).attr('id', id.substr(0, id.length - 5));
       });
-      //remove the old container paragraph
       $('#dictionaryContent p').remove();
+      //If there was no result, at least display that
+      if($('#dictionaryContent').html().trim().length == 0){
+        $('#dictionaryContent').html("<h3>Sorry!</h3><p>It looks like no result could be found for that word.</p>");
+      }
 
       //Handle the click of the lexicon request button
       $("#dictionaryContent").find('.lexLink').attr('onclick', 'andromeda.search.loadLexicon(event, this);');
 
       //show the word
-      loadWord($('#dictionaryContent').html(), title);
+      loadWord($('#dictionaryContent').html(), title, locus);
 
       //cache this specific word
-      cacheDictWord(title, $('#dictionaryContent').html(), morphUrl);
+      cacheDictWord(title, $('#dictionaryContent').html(), morphUrl, locus);
 
 
       //re-add the listener for the header
@@ -323,7 +378,7 @@ var andromeda = {
           //attach click listeners to the dropdown
           headerDropdown.find('.dropdownLink').click(function(event){
             var cachedObj = _a.environment.dictionary.cache[$(this).attr('resultIndex')];
-            loadWord(cachedObj.data, cachedObj.wordTitle);
+            loadWord(cachedObj.data, cachedObj.wordTitle, cachedObj.loc);
           });
         }else{
           hideDropdown();
@@ -349,14 +404,14 @@ var andromeda = {
     var cached = false;
     $.each(_a.environment.dictionary.cache, function(index, word){
       if(word.wordUrl == lexiconUrl){
-        loadWord(word.data, word.wordTitle);
+        loadWord(word.data, word.wordTitle, word.loc);
         cached = true;
        }
     });
     if(cached) return;
 
     $.ajax({url: lexiconUrl, success: function(result){
-      cacheDictWord(wordTitle, result, lexiconUrl);
+      cacheDictWord(wordTitle, result, lexiconUrl, '');
       loadWord(result, wordTitle);
     }});
   }
@@ -366,11 +421,12 @@ var andromeda = {
    * recreates the dropdown menu
    * @method cacheDictWord
    */
-  var cacheDictWord = function(title, html, url){
+  var cacheDictWord = function(title, html, url, locus){
     var cache = {
       wordTitle: title,
       data: html,
-      wordUrl: url
+      wordUrl: url,
+      loc: locus
     }
     //add the result to the cache
     _a.environment.dictionary.cache.unshift(cache);
@@ -380,7 +436,7 @@ var andromeda = {
     _a.environment.dictionary.dropdown = '';
     $.each(_a.environment.dictionary.cache, function(index, word){
       _a.environment.dictionary.dropdown += "<div class='dropdownLink' resultIndex=" + index +
-                        "><span class='dropdownIcon'/>" + word.wordTitle + "</div>";
+                        "><span class='dropdownIcon'/>" + word.wordTitle + ' ' + word.loc + "</div>";
     });
   }
 
@@ -394,18 +450,33 @@ var andromeda = {
     //create new event handlers
     $('.text a').click(function(event){
       event.preventDefault();
-      var lineNumberElement = $(this).prevAll('span').get(0);
-      var lineNumber = (lineNumberElement == undefined) ? "" : lineNumberElement.textContent;
-      var wordTitle = $(this).text() + ((lineNumberElement == undefined) ? "" : (": " + lineNumber));
-      loadDictionaryPerseus($(this).attr('href'), wordTitle);
-    });
-  }
 
-  /**
-   * Removes the grey out effect from all necessary divs
-   */
-  var removeGreyOut = function(){
-    $('.greyed-out').removeClass('greyed-out');
+      //Linenumbering shit. Construct a locus. THis is hell
+      var lineNumberElement = $(this).prevAll('span').get(0);
+
+      //The linenumber is the previous linenumber if there was one
+      var lineNumber = (lineNumberElement == undefined) ? "" : lineNumberElement.textContent;
+      var txtName = _a.environment.text.name;
+      //if there wasn't try to find out what the first one should be based onthe textname
+      if(lineNumberElement == undefined){
+        if(txtName.startsWith('lines')){
+          lineNumber = txtName.split(' ')[1].split('-')[0];
+        }else if(txtName.startsWith('chapter') || txtName.startsWith('book')){
+          lineNumber = '1';
+        }else if(txtName.startsWith('poem')){
+          lineNumber = '';
+        }
+      }
+      var wordTitle = $(this).text();
+      //preface the section name, only if it is not identical to the text name
+      var locus = (_a.environment.text.section !== _a.environment.text.name) ? _a.environment.text.section : '';
+      //append the textName to the locus only if the name is not a line summary
+      locus += (!txtName.startsWith('lines'))? _a.environment.text.name : '';
+      //if we have added anything to the locus thus far and we still need to add a linenumber, separate with a dot
+      if(locus.length > 0 && lineNumber.length > 0) locus += '.';
+      locus += lineNumber.toString();
+      loadDictionaryPerseus($(this).attr('href'), wordTitle, locus);
+    });
   }
 
   /**

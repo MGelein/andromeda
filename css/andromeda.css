@@ -29,6 +29,11 @@ body{
   margin-bottom: 2vh;
 }
 
+.locus{
+  font-weight: lighter;
+  font-size: 80%;
+}
+
 .cell{
   box-shadow: 0px 0px 2px rgba(0, 0, 0, 0.4);
   overflow: auto;
@@ -81,11 +86,12 @@ body{
 }
 
 .textNav{
+  display: block;
   cursor: pointer;
   border: 1px solid #777;
   border-radius: 0.5vh;
-  padding-left: 0.5vh;
-  padding-right: 0.5vh;
+  margin-left: 0.5vh;
+  margin-right: 0.5vh;
 }
 
 /**
