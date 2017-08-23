@@ -71,6 +71,15 @@ body{
   background-color: #ccc;
 }
 
+.lexLink{
+  margin-right: 2px;
+}
+
+.lexiconName {
+  font-size: 80%;
+  font-weight: lighter;
+}
+
 /**
  * ID's
  */

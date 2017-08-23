@@ -17,14 +17,6 @@ var andromeda = {
   var SEARCH_URL = "http://www.perseus.tufts.edu/hopper/searchresults?q=";
   var MORPH_URL = "http://www.perseus.tufts.edu/hopper/";
   var DICT_CACHE_SIZE = 10;
-  //some example URLS for the lexicon
-  //GREEK
-  var LSJ_URL = "?doc=Perseus:text:1999.04.0057:entry=kate/rxomai";//LSJ
-  var ML_URL = "?doc=Perseus:text:1999.04.0057:entry=kate/rxomai";//Middle Liddel
-  var AUT_URL = "?doc=Perseus:text:1999.04.0073:entry=kate/rxomai";//Autenrieth
-  //LATIN
-  var LWS_URL = "?doc=Perseus:text:1999.04.0059:entry=tu";//Lewis & Short
-  var ELW_URL = "?doc=Perseus:text:1999.04.0060:entry=tu";//Elementary Lewis
 
   /**
    * This function is called by the 'Load From Perseus Button'
@@ -226,30 +218,33 @@ var andromeda = {
       var mainColumn = $(result).find('#main_col').get(0);
       $('#dictionaryContent').html(mainColumn.innerHTML);
       $('#dictionaryContent table').addClass('table table-condensed table-striped');
-      //for now remove the word frequency statistics and the option to open in other lexica
+      //for now remove the word frequency statistics
       $('#dictionaryContent .word_freq').remove();
+      //Move all lexica links to the end of the lemma
+      $('#dictionaryContent a[href="#lexicon"]').each(function(index, value){
+        $(value).closest('.lemma').append(value);
+        $(value).addClass('btn btn-primary btn-sm lexLink');
+        //overwrite any old click behaviour
+        $(value).removeAttr('onclick');
+        $(value).prop('onclick', null);
+        //reset the href attribute
+        $(value).attr('href', '#');
+        //remove '-link' from the id so it can be used from hereonout
+        var id = $(value).attr('id');
+        $(value).attr('id', id.substr(0, id.length - 5));
+      });
+      //remove the old container paragraph
       $('#dictionaryContent p').remove();
+
+      //Handle the click of the lexicon request button
+      $("#dictionaryContent").find('.lexLink').attr('onclick', 'andromeda.search.loadLexicon(event, this);');
 
       //show the word
       loadWord($('#dictionaryContent').html(), title);
 
-      //create the cache object
-      var cache = {
-        wordTitle : title,
-        data : $('#dictionaryContent').html(),
-        wordUrl: morphUrl
-      }
+      //cache this specific word
+      cacheDictWord(title, $('#dictionaryContent').html(), morphUrl);
 
-      //add the result to the cache
-      _a.environment.dictionary.cache.unshift(cache);
-      //if we have too many cached, remove the oldest one
-      if(_a.environment.dictionary.cache.length > DICT_CACHE_SIZE) _a.environment.dictionary.cache.pop();
-      //recreate the data to display on header click
-      _a.environment.dictionary.dropdown = '';
-      $.each(_a.environment.dictionary.cache, function(index, word){
-        _a.environment.dictionary.dropdown += "<div class='dropdownLink' resultIndex=" + index +
-                          "><span class='dropdownIcon'/>" + word.wordTitle + "</div>";
-      });
 
       //re-add the listener for the header
       $('#dictionaryHeader').unbind('click').click(function(event){
@@ -283,13 +278,66 @@ var andromeda = {
 
           //attach click listeners to the dropdown
           headerDropdown.find('.dropdownLink').click(function(event){
-            loadWord(_a.environment.dictionary.cache[$(this).attr('resultIndex')].data, $(this).text());
+            var cachedObj = _a.environment.dictionary.cache[$(this).attr('resultIndex')];
+            loadWord(cachedObj.data, cachedObj.wordTitle);
           });
         }else{
           hideDropdown();
         }
       });
     }});
+  }
+
+  /**
+   * Called by the lexicon links
+   * @param  {Event} event the mouse event, to stop propagation
+   * @param  {Element} link  the clicked anchor element
+   */
+  var loadLexicon = function(event, link){
+    event.stopPropagation();
+    //get the data from the link
+    var lexiconName = link.textContent;
+    var lemmaName = $(link).closest('.lemma').find('h4').get(0).textContent;
+    var wordTitle = lemmaName + "&nbsp;<span class='lexiconName'>(" + lexiconName + ")</span>";
+    var lexiconUrl = TEXT_LOAD_URL + "?doc=" + link.id;
+
+    //check if it is already cached
+    var cached = false;
+    $.each(_a.environment.dictionary.cache, function(index, word){
+      if(word.wordUrl == lexiconUrl){
+        loadWord(word.data, word.wordTitle);
+        cached = true;
+       }
+    });
+    if(cached) return;
+
+    $.ajax({url: lexiconUrl, success: function(result){
+      cacheDictWord(wordTitle, result, lexiconUrl);
+      loadWord(result, wordTitle);
+    }});
+  }
+
+  /**
+   * Handles the caching of words, prevents the cache from exceeding the limits,
+   * recreates the dropdown menu
+   * @method cacheDictWord
+   */
+  var cacheDictWord = function(title, html, url){
+    var cache = {
+      wordTitle: title,
+      data: html,
+      wordUrl: url
+    }
+    //add the result to the cache
+    _a.environment.dictionary.cache.unshift(cache);
+    //if we have too many cached, remove the oldest one
+    if(_a.environment.dictionary.cache.length > DICT_CACHE_SIZE) _a.environment.dictionary.cache.pop();
+    //recreate the data to display on header click
+    _a.environment.dictionary.dropdown = '';
+    $.each(_a.environment.dictionary.cache, function(index, word){
+      _a.environment.dictionary.dropdown += "<div class='dropdownLink' resultIndex=" + index +
+                        "><span class='dropdownIcon'/>" + word.wordTitle + "</div>";
+    });
   }
 
   /**
@@ -334,7 +382,8 @@ var andromeda = {
   }
 
   _a.search = {
-    perseus: searchPerseus
+    perseus: searchPerseus,
+    loadLexicon: loadLexicon
   };
 
   _a.ui = {
