@@ -80,11 +80,28 @@ var andromeda = {
           result = result.replace(/<img/g, '<span');
           var jResult = $(result);
 
+          //log each `.current` to form a locus
+          _a.environment.text.locus = '';
+          jResult.find('.current').each(function(index, val){
+             var part = $(val).attr('title');
+
+             //capitalize each word correctly and trim it
+             part = _a.util.ucfirst(part);
+             part = part.trim();
+
+            //Special case of sections, they need to be incorporated into the chapter
+            if(part.indexOf('ection') != -1){
+              _a.environment.text.locus += part.replace('Section ', '.');
+            }else{
+              _a.environment.text.locus += ', ' + part;
+            }
+          });
+          //take of the first two characters;
+          _a.environment.text.locus = _a.environment.text.locus.substr(2);
+
           //get a link to the current page from the result and save it in the global andromeda environment object
           var currentLink = jResult.find('.current').filter(':last').get(0);
           _a.environment.text.doc = TEXT_LOAD_URL + $(currentLink).attr('href');
-          _a.environment.text.name = $(currentLink).attr('title');
-          _a.environment.text.section = $(jResult.find('.current').get(0)).attr('title');
           _a.environment.text.title = $(jResult.find('#header_text').get(0)).find('h1').get(0).textContent;
           //get the prev and next segment
           var nextArrow = jResult.find('.arrow span[alt="next"]').get(0);
@@ -223,7 +240,7 @@ var andromeda = {
       result = result.replace(/<hr[^>]*>/g,"");
 
       $('#textContent').html(result);
-      $('#textHeader').html('Text: <span class="titleName">' + _a.environment.text.title + " | " + _a.environment.text.name + "</span>");
+      $('#textHeader').html('Text: <span class="titleName">' + _a.environment.text.title + " | " + _a.environment.text.locus + "</span>");
 
       //overwrite the default <a> behaviour
       registerWordHandlers();
@@ -367,8 +384,10 @@ var andromeda = {
           $(document).click(function(){hideDropdown();});
 
           //make the currently selected one different
-          headerDropdown.find('.dropdownLink').each(function(index, link){
-            if($('#dictionaryHeader').text().indexOf($(link).text()) == -1) return;
+          headerDropdown.find('.dropdownLink').each(function(index, link){              //apparently there are multiple forms of space.... o.0
+            var dictHeaderText = $('#dictionaryHeader').text().replace('Dictionary:', '').trim().replace(' ', '').replace(' ', '');
+            var linkHeaderText = $(link).text().trim().replace(' ', '');
+            if(dictHeaderText != linkHeaderText) return;
             $($(link).find('.dropdownIcon').get(0)).addClass('dropdownActiveIcon');
           });
 
@@ -436,7 +455,7 @@ var andromeda = {
     _a.environment.dictionary.dropdown = '';
     $.each(_a.environment.dictionary.cache, function(index, word){
       _a.environment.dictionary.dropdown += "<div class='dropdownLink' resultIndex=" + index +
-                        "><span class='dropdownIcon'/>" + word.wordTitle + ' ' + word.loc + "</div>";
+                        "><span class='dropdownIcon'/><span class='dictLemma'" + word.wordTitle + '</span><span class="locus">' + word.loc + "</span></div>";
     });
   }
 
@@ -450,33 +469,53 @@ var andromeda = {
     //create new event handlers
     $('.text a').click(function(event){
       event.preventDefault();
+      //get the title of the word. What the Dict. query is titled
+      var wordTitle =  "<span class='dictLemma'>" + $(this).text(); + '</span>';
+      //get the locus from the element
+      var locus = getLocusFromElement(this);
 
-      //Linenumbering shit. Construct a locus. THis is hell
-      var lineNumberElement = $(this).prevAll('span').get(0);
-
-      //The linenumber is the previous linenumber if there was one
-      var lineNumber = (lineNumberElement == undefined) ? "" : lineNumberElement.textContent;
-      var txtName = _a.environment.text.name;
-      //if there wasn't try to find out what the first one should be based onthe textname
-      if(lineNumberElement == undefined){
-        if(txtName.startsWith('lines')){
-          lineNumber = txtName.split(' ')[1].split('-')[0];
-        }else if(txtName.startsWith('chapter') || txtName.startsWith('book')){
-          lineNumber = '1';
-        }else if(txtName.startsWith('poem')){
-          lineNumber = '';
-        }
-      }
-      var wordTitle = $(this).text();
-      //preface the section name, only if it is not identical to the text name
-      var locus = (_a.environment.text.section !== _a.environment.text.name) ? _a.environment.text.section : '';
-      //append the textName to the locus only if the name is not a line summary
-      locus += (!txtName.startsWith('lines'))? _a.environment.text.name : '';
-      //if we have added anything to the locus thus far and we still need to add a linenumber, separate with a dot
-      if(locus.length > 0 && lineNumber.length > 0) locus += '.';
-      locus += lineNumber.toString();
-      loadDictionaryPerseus($(this).attr('href'), wordTitle, locus);
+      loadDictionaryPerseus($(this).attr('href'),wordTitle, locus);
     });
+  }
+
+  /**
+   * Constructs the locus from the provided element and the knowledge of the document
+   * @param  {Element} el the HTML element that we want to get the locus of
+   * @return {String}     the locus string
+   */
+  var getLocusFromElement = function(el){
+    //first get a copy of the text locus
+    var locus = _a.environment.text.locus;
+    //get the linenumber element previous to this element
+    var lineNumberElement = $(el).prevAll('span').get(0);
+    //The linenumber is the previous linenumber if there was one
+    var lineNumber = (lineNumberElement == undefined) ? "" : lineNumberElement.textContent;
+    //the last part of the locus
+    var lastPart = locus.split(', ').pop();
+    //If no linenumber pev
+    if(lineNumber.length < 1){
+      //based on the type of lastpart, let's
+      if(lastPart.startsWith('Book')){
+        lineNumber = '1';
+      }else if(lastPart.startsWith('Chapter')){
+        if(lastPart.indexOf(".") != -1){//If we already included a section number
+          lineNumber = '';
+        }else{
+          lineNumber = '1';
+        }
+      }else if(lastPart.startsWith('Poem')){
+        lineNumber = '' + ($(el).prevAll('br').length + 1);
+      }else if(lastPart.startsWith('Lines')){
+        lineNumber = lastPart.split(' ')[1].split('-')[0];
+      }
+    }
+    //if the lastpart is a lines scope (Lines 1-50), remove it.
+    if(lastPart.startsWith('Lines')){
+      locus = locus.replace(', ' + lastPart, '');
+    }
+    //if we have found or created a linnumber, separate it with a period
+    if(lineNumber.length > 0) locus += '.';
+    return locus + lineNumber;
   }
 
   /**
@@ -495,6 +534,25 @@ var andromeda = {
         }
     });
   }
+
+  _a.util = {
+    /**
+     * Uppercase for the first letter of every word in a sentence. Utiltity function
+     * @param  {String} s the string you want to modify
+     * @return {String}   The Modified String With Uppercase For Each Word
+     */
+    ucfirst : function(s){
+      var words = s.split(' ');
+      var res = [];
+      var temp;
+      for(var i in words){
+        temp = words[i].toLowerCase();
+        temp = temp.charAt(0).toUpperCase() + temp.substr(1);
+        res.push(temp);
+      }
+      return res.join(' ');
+    }
+  };
 
   _a.search = {
     perseus: searchPerseus,

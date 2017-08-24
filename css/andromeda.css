@@ -29,9 +29,18 @@ body{
   margin-bottom: 2vh;
 }
 
+.dictLemma{
+  font-style: italic;
+  font-weight: bold;
+}
+
 .locus{
   font-weight: lighter;
-  font-size: 80%;
+  color: #666;
+  font-size: 100%;
+  float: right;
+  vertical-align: bottom;
+  margin-right: 1vh;
 }
 
 .cell{
