@@ -45,7 +45,11 @@ var andromeda = {
     if(!query.startsWith('http')){
       perseusUrl = SEARCH_URL +  encodeURI(query);
     }
+    //empty the note and dictionary content
+    $('#noteContent').html('');
+    $('#dictionaryContent').html('');
 
+    //start loading the actual text
     startLoadingText(perseusUrl);
   }
 
@@ -55,12 +59,6 @@ var andromeda = {
    * urls
    */
   var startLoadingText = function(perseusUrl){
-    //set the dictionary and notes to ask the user to start doing something
-    var dictionaryNotUsed = "<br><h3>No Dictionary</h3><p>There are no word queries to display. To get started using the dictionary click a word in the main text in the middle column.</p>";
-    var notesNotUsed = "<br><h3>No Notes</h3><p>There are no notes to display. To get started taking notes make a selection in the main text in the middle column and press the 'Add Note' button.</p>";
-    $('#dictionaryContent').html(dictionaryNotUsed);
-    $('#noteContent').html(notesNotUsed);
-
     //reset the environment variables
     _a.environment.translations = [];
     _a.environment.text = {};
@@ -227,12 +225,251 @@ var andromeda = {
   }
 
   /**
+   * Handles the selection event of the mainText
+   */
+  var selectionHandler = function(event){
+    var sel = _a.util.getSelected();
+    //if this is not a selection, hide the addNote and stop
+    if(sel.isCollapsed) {hideAddNote(); return;}
+    //get the start and endNode
+    var startNode = sel.anchorNode;
+    var endNode = sel.focusNode;
+    //don't allow empty or only whitespace selections
+    if(sel.toString().trim().length == 0) return;
+
+    //2 = the magical number that means the node order is backwards :D
+    if(startNode.compareDocumentPosition(endNode) == 2){//if we are selecting backwards, swap the start and end
+      var tempNode = endNode;
+      endNode = startNode;
+      startNode = tempNode;
+    }
+
+    //get the startLocus from the element
+    var startLocus = getLocusFromElement(startNode);
+    var addNote = $('#addNote');
+
+    //save the information for this note
+    var toAdd = {
+      locus: startLocus,
+      text: sel.toString()
+    }
+    //save it in the env variables
+    _a.environment.note.toAdd = toAdd;
+
+    //positions the addNote button
+    var positionAddNote = function(){
+      //normalize to the containing element
+      if($(startNode.parentNode).is('a')) startNode = startNode.parentNode;
+      var startEl = $(startNode);
+      if(!startEl.is('a')){
+        startEl = startEl.prev();
+      }
+      var offset = startEl.offset();
+      //if no offset could be found, return!
+      if(offset == undefined) return;
+      //set the addNote position
+      addNote.offset({top: 0, left: 0});
+      addNote.offset({top: offset.top - startEl.height() * 2, left: offset.left});
+    }
+    positionAddNote();
+    //reposition on resize
+    $(window).unbind('resize').resize(positionAddNote);
+    //hide on click anywhere outside of the button
+    $(document).mousedown(hideAddNote);
+
+    //finally fade in the button
+    addNote.fadeIn();
+  }
+
+  /**
+   * Addes a new Note to the note object
+   */
+  var addNewNote = function(event){
+    //stop the event from propagating but also hide the button
+    if(event != undefined) event.stopPropagation();
+    hideAddNote();
+
+    //start working with the note that needs to be added
+    var toAdd = _a.environment.note.toAdd;
+    var text = toAdd.text;
+    //clean the text, remove returns and newlines
+    text = text.replace(/[\n\r]/g, ' ');
+    toAdd.text = text;
+    //now split it into words and only use the first two and last two words as the blurb
+    var words = text.split(' ');
+    var blurb = text;
+    //if there are more than 4 words
+    if(words.length > 4){
+        blurb = words[0] + ' ' + words[1] + '[..]' + words[words.length - 2] + ' ' + words[words.length - 1];
+    }
+    //add the created blurb to the to-add object
+    toAdd.blurb = blurb;
+
+    //add it to the displayed data
+    loadNoteDisplay(toAdd);
+  }
+
+  /**
+   * Adds a new note to the note display
+   *
+   */
+  var loadNoteDisplay = function(note){
+    var pointPart = note.locus.replace(/ /g, '_').split('.');
+    var locusParts = pointPart[0].split(',_');
+    //if there was a point part
+    if(pointPart.length > 1) locusParts.push(pointPart[1]);
+
+    var secondLevelClass = 'secondLevel';
+    if(locusParts.length == 2) secondLevelClass = 'thirdLevel';
+
+    //for each of the locus parts generate an element if it didn't already exist
+    $.each(locusParts, function(index, part){
+        if(index == 0){
+          //check if this header has not been created yet
+          if($('#noteContent').find('#note-' + part).length == 0){
+            $('#noteContent').append(
+              '<div class="topLevel" id="note-' + part + '"><h5>'
+              + part.replace('_', ' ') + '</h5></div>'
+            );
+
+            //sort the top level divs
+            $('#noteContent').find('.topLevel').sort(function(a, b){
+              var locA = $(a).find('h5').get(0).textContent;
+              var locB = $(b).find('h5').get(0).textContent;
+              return compareLoci(locA, locB);
+            }).appendTo($('#noteContent'));
+          }
+        }else if(index == 1){
+          if($('#noteContent').find('#note-' + locusParts[0] + '-' + part).length == 0){
+            $('#noteContent').find('#note-' + locusParts[0]).append(
+              '<div class="' + secondLevelClass + '" id="note-' + locusParts[0] + '-' + part + '"><span class="level2Name">'
+              + part.replace('_', ' ') + '</span></div>'
+            );
+
+            //sort the second level divs
+            $('#note-' + locusParts[0]).find('.' + secondLevelClass).sort(function(a, b){
+              var locA = $(a).find('.level2Name').get(0).textContent;
+              var locB = $(b).find('.level2Name').get(0).textContent;
+              return compareLoci(locA, locB);
+            }).appendTo($('#note-' + locusParts[0]));
+          }
+        }else if(index == 2){
+          if($('#noteContent').find('#note-' + locusParts[0] + '-' + locusParts[1] + '-' + part).length == 0){
+            $('#noteContent').find('#note-' + locusParts[0] + '-' + locusParts[1]).append(
+              '<div class="thirdLevel" id="note-' + locusParts[0] + '-' + locusParts[1] + '-' + part + '"><span class="level3Name">'
+              + part.replace('_', '') + '</span></div>'
+            );
+
+            //sort the third level divs
+            $('#note-' + locusParts[0] + '-' + locusParts[1]).find('.thirdLevel').sort(function(a, b){
+              var locA = $(a).find('.level3Name').get(0).textContent;
+              var locB = $(b).find('.level3Name').get(0).textContent;
+              return compareLoci(locA, locB);
+            }).appendTo($('#note-' + locusParts[0] + '-' + locusParts[1]));
+          }
+        }
+    });
+    //now that we're sure a parent element exist, append the note to it
+    var noteHolderId = 'note-' + locusParts.join('-');
+    if(note.data == undefined || note.data.length < 1){
+      note.data = "[Click To Edit]";
+    }
+    $('#' + noteHolderId).append(
+      '<div class="note"><div class="noteLemma">'
+      + note.blurb +  '&nbsp;:&nbsp;'
+      + '<button class="float-right btn btn-outline-primary btn-sm btn-xs removeNoteButton" onclick="andromeda.search.removeNote(this)">✖</button>'
+      + '</div><div class="noteData">'
+      + note.data + '</div></div>'
+    );
+
+    //Bind the noteData Edit click
+    $('.noteData').unbind('click').click(function(event){
+        //allow the content to be edited
+        $(this).attr('contenteditable', 'true');
+
+        //stop the content editing on enter press
+        $(this).keydown(function(event){
+          if(event.keyCode == 13 && !event.shiftKey){
+            $(this).attr('contenteditable', 'false');
+          }
+        });
+    });
+  }
+
+  /**
+   * Called by the remove button. Contains a ref to the remove button of the
+   * note to be removed
+   */
+  var removeNote = function(btn){
+    //first get a ref to the note that holds the button
+    var note = $(btn).parent().parent();
+    //check if the parent of this note contains other notes that the one we're removing
+    //also implement a failsafe to prevent it deleting every div up to the document root. Stop at '#noteContent'
+    while(note.parent().find('.note').length == 1 && note.parent().attr('id') != 'noteContent'){
+      note = note.parent();
+    }
+    //finally remove the content
+    note.fadeOut().promise().done(function(){this.remove();});
+  }
+
+  /**
+   * Compare function, returns if one should be before the other
+   */
+  var compareLoci = function(locA, locB){
+      //split on spaces
+      var partsA = locA.split(' ');
+      var partsB = locB.split(' ');
+      var partB, partA;
+      for(var i = 0; i < partsA.length; i++){
+        //get the corresponding parts
+        partA = partsA[i];
+        partB = partsB[i];
+        if(isNaN(partA) || isNaN(partB)){
+          if(partA < partB) return -1;
+          if(partA > partB) return 1;
+          //if they are the same, continue this loop
+        }else{
+          var numA = parseFloat(partA);
+          var numB = parseFloat(partB);
+          if(numA < numB) return -1;
+          if(numA > numB) return 1;
+        }
+      }
+      //if you reach this, they are apparently identical
+      return 0;
+  }
+
+  /**
+   * Hides the add Note Btton
+   */
+  var hideAddNote = function(){
+    var addNote = $('#addNote');
+    addNote.offset({top: 0, left: 0});
+    addNote.hide();
+    $(document).unbind('mousedown');
+    $(window).unbind('resize');
+    //Try to remove the selection
+    if (window.getSelection) {
+      if (window.getSelection().empty) {  // Chrome
+        window.getSelection().empty();
+      } else if (window.getSelection().removeAllRanges) {  // Firefox
+        window.getSelection().removeAllRanges();
+      }
+    } else if (document.selection) {  // IE?
+      document.selection.empty();
+    }
+  }
+
+  /**
    * Loads a text from Perseus
    */
   var loadText = function(){
     //Show that we're loading
     $('#textHeader').html('Text: Loading');
     $('#textContent').html('');
+
+    //bind the selection listener
+    $('#textContent').unbind('mouseup').mouseup(selectionHandler);
 
     //load it asynchronously
     $.ajax({url: _a.environment.text.doc, success: function(result){
@@ -299,8 +536,13 @@ var andromeda = {
   /**
    * Just loads the word
    */
-  var loadWord = function(html, title, locus){
-    $('#dictionaryHeader').html('Dictionary: ' + title + ' <span class="locus">' + locus + '</span>');
+  var loadWord = function(html, title, loc){
+    _a.environment.dictionary.current = {
+      text: title,
+      locus: loc,
+      data: ''
+    };
+    $('#dictionaryHeader').html('Dictionary: <span class="dictLemma">' + title + '</span> <span class="locus">' + loc + '</span>');
     $('#dictionaryContent').html(html);
   }
 
@@ -330,13 +572,17 @@ var andromeda = {
       //Take only the main column from the result page
       var mainColumn = $(result).find('#main_col').get(0);
       $('#dictionaryContent').html(mainColumn.innerHTML);
-      $('#dictionaryContent table').addClass('table table-condensed table-striped');
+      $('#dictionaryContent table').addClass('table table-sm table-striped');
+
+      //add the add to notes button
+      var addToNoteButton = "<button class='btn btn-sm btn-outline-primary btn-xs' onclick='andromeda.search.addDictNote(event, this)'>+Notes</button>";
+      $('#dictionaryContent .lemma_header').append(addToNoteButton);
       //for now remove the word frequency statistics
       $('#dictionaryContent .word_freq').remove();
       //Move all lexica links to the end of the lemma
       $('#dictionaryContent a[href="#lexicon"]').each(function(index, value){
         $(value).closest('.lemma').append(value);
-        $(value).addClass('btn btn-primary btn-sm lexLink');
+        $(value).addClass('btn btn-primary btn-sm btn-xs lexLink');
         //overwrite any old click behaviour
         $(value).removeAttr('onclick');
         $(value).prop('onclick', null);
@@ -407,6 +653,27 @@ var andromeda = {
   }
 
   /**
+   * Adds a new note form the dictionary. Includes a reference to the button that calls this function
+   * @param  {Event} event The event fired by the button
+   * @param  {Element} btn   The button
+   */
+  var addDictNote = function(event, btn){
+    event.stopPropagation();
+    //get the lemmaHeader
+    var lemmaHeader = $(btn).parent().get(0);
+    var lemma = $(lemmaHeader).find('h4').get(0);
+    var lemmaDef = $(lemmaHeader).find('.lemma_definition').get(0);
+
+    _a.environment.note.toAdd = {
+      locus: _a.environment.dictionary.current.locus,
+      text: _a.environment.dictionary.current.text,
+      data: lemma.textContent + "&nbsp;=&nbsp;" + lemmaDef.textContent
+    };
+
+    addNewNote(undefined);
+  }
+
+  /**
    * Called by the lexicon links
    * @param  {Event} event the mouse event, to stop propagation
    * @param  {Element} link  the clicked anchor element
@@ -431,7 +698,7 @@ var andromeda = {
 
     $.ajax({url: lexiconUrl, success: function(result){
       cacheDictWord(wordTitle, result, lexiconUrl, '');
-      loadWord(result, wordTitle);
+      loadWord(result, wordTitle, '');
     }});
   }
 
@@ -455,7 +722,7 @@ var andromeda = {
     _a.environment.dictionary.dropdown = '';
     $.each(_a.environment.dictionary.cache, function(index, word){
       _a.environment.dictionary.dropdown += "<div class='dropdownLink' resultIndex=" + index +
-                        "><span class='dropdownIcon'/><span class='dictLemma'" + word.wordTitle + '</span><span class="locus">' + word.loc + "</span></div>";
+                        "><span class='dropdownIcon'/><span class='dictLemma'>" + word.wordTitle + '</span><span class="locus">' + word.loc + "</span></div>";
     });
   }
 
@@ -470,7 +737,7 @@ var andromeda = {
     $('.text a').click(function(event){
       event.preventDefault();
       //get the title of the word. What the Dict. query is titled
-      var wordTitle =  "<span class='dictLemma'>" + $(this).text(); + '</span>';
+      var wordTitle =  $(this).text();
       //get the locus from the element
       var locus = getLocusFromElement(this);
 
@@ -486,6 +753,8 @@ var andromeda = {
   var getLocusFromElement = function(el){
     //first get a copy of the text locus
     var locus = _a.environment.text.locus;
+    //check if it is a text node within a word or it is the actual word element
+    if($(el.parentNode).is('a')) el = el.parentNode;
     //get the linenumber element previous to this element
     var lineNumberElement = $(el).prevAll('span').get(0);
     //The linenumber is the previous linenumber if there was one
@@ -551,12 +820,31 @@ var andromeda = {
         res.push(temp);
       }
       return res.join(' ');
+    },
+
+    /**
+     * Returns the text that is currently selected
+     * @return {String} the selected text
+     */
+    getSelected : function(){
+      var t = '';
+      if (window.getSelection) {
+          t = window.getSelection();
+      } else if (document.getSelection) {
+          t = document.getSelection();
+      } else if (document.selection) {
+          t = document.selection.createRange().text;
+      }
+      return t;
     }
   };
 
   _a.search = {
     perseus: searchPerseus,
-    loadLexicon: loadLexicon
+    loadLexicon: loadLexicon,
+    addNote : addNewNote,
+    addDictNote: addDictNote,
+    removeNote: removeNote
   };
 
   _a.ui = {
@@ -569,6 +857,10 @@ var andromeda = {
     translations: [],
     dictionary: {
       cache: []
+    },
+    note: {
+      all: [],
+      toAdd: {}
     }
   }
 })(andromeda);
@@ -579,4 +871,5 @@ var andromeda = {
 $(document).ready(function(){
   andromeda.ui.registerClickHandlers();
   $('#headerDropdown').hide();
+  $('#addNote').hide();
 });
