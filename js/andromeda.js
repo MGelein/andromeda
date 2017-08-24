@@ -328,9 +328,11 @@ var andromeda = {
           //check if this header has not been created yet
           if($('#noteContent').find('#note-' + part).length == 0){
             $('#noteContent').append(
-              '<div class="topLevel" id="note-' + part + '"><h5>'
-              + part.replace('_', ' ') + '</h5></div>'
-            );
+              '<div class="topLevel" id="note-' + part + '">'
+              + '<span class="collapseButton">▼</span><h5>'
+              + part.replace('_', ' ') + '</h5>'
+              +'</div>'
+            );//▶
 
             //sort the top level divs
             $('#noteContent').find('.topLevel').sort(function(a, b){
@@ -343,7 +345,7 @@ var andromeda = {
           if($('#noteContent').find('#note-' + locusParts[0] + '-' + part).length == 0){
             $('#noteContent').find('#note-' + locusParts[0]).append(
               '<div class="' + secondLevelClass + '" id="note-' + locusParts[0] + '-' + part + '"><span class="level2Name">'
-              + part.replace('_', ' ') + '</span></div>'
+              + part.replace('_', ' ') + '</span><span class="collapseButton">▼</span></div>'
             );
 
             //sort the second level divs
@@ -357,7 +359,7 @@ var andromeda = {
           if($('#noteContent').find('#note-' + locusParts[0] + '-' + locusParts[1] + '-' + part).length == 0){
             $('#noteContent').find('#note-' + locusParts[0] + '-' + locusParts[1]).append(
               '<div class="thirdLevel" id="note-' + locusParts[0] + '-' + locusParts[1] + '-' + part + '"><span class="level3Name">'
-              + part.replace('_', '') + '</span></div>'
+              + part.replace('_', '') + '</span><span class="collapseButton">▼</span></div>'
             );
 
             //sort the third level divs
@@ -369,6 +371,17 @@ var andromeda = {
           }
         }
     });
+    //once a new level indicator has been added, re-add all the collapse stuff
+    $('.collapseButton').unbind('click').click(function(event){
+      if($(this).text() == '▼'){
+        $(this).parent().find('> div').fadeOut();
+        $(this).text('▶');
+      }else{
+        $(this).parent().find('> div').fadeIn();
+        $(this).text('▼');
+      }
+    });
+
     //now that we're sure a parent element exist, append the note to it
     var noteHolderId = 'note-' + locusParts.join('-');
     if(note.data == undefined || note.data.length < 1){
@@ -381,6 +394,12 @@ var andromeda = {
       + '</div><div class="noteData">'
       + note.data + '</div></div>'
     );
+
+    //if the noteHolder is collapsed that we're adding to, uncollapse it
+    var collapseBut = $('#' + noteHolderId).find('.collapseButton');
+    if(collapseBut.text() == '▶'){
+      collapseBut.click();
+    }
 
     //Bind the noteData Edit click
     $('.noteData').unbind('click').click(function(event){

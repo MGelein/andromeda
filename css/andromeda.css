@@ -24,6 +24,23 @@ body{
  * CUSTOM CLASSES
  */
 
+.collapseButton{
+  margin-left: -0.8em;
+  margin-right: 0.5vh;
+  float:left;
+  cursor: pointer;
+  opacity: 0.2;
+  -webkit-transition: opacity .35s ease-in-out;
+  -moz-transition: opacity .35s ease-in-out;
+  -ms-transition: opacity .35s ease-in-out;
+  -o-transition: opacity .35s ease-in-out;
+  transition: opacity .35s ease-in-out;
+}
+
+.collapseButton:hover{
+  opacity: 1.0;
+}
+
 .lemma_definition{
   font-style: italic;
 }
@@ -162,7 +179,7 @@ body{
 }
 
 .level2Name{
-  margin-left: -0.5em;
+  margin-left: -0.3em;
 }
 
 /**
