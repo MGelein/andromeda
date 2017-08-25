@@ -24,6 +24,10 @@ body{
  * CUSTOM CLASSES
  */
 
+.noPointer{
+  cursor: default;
+}
+
 .collapseButton{
   margin-left: -0.8em;
   margin-right: 0.5vh;

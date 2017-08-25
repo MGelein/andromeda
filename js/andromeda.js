@@ -21,12 +21,17 @@ var andromeda = {
   //contains the HTML for the text dropdown. Just saved in a variable to not pollute the code
   var textDropdownHTML = "<div class='row'><hr>"
   + "<div class='col-sm-12 text-center'><h4>Navigation</h4></div>"
-  + "<div class='col-sm-6 text-center'><span id='prevSeg' class='greyed-out'>◀&nbsp;Previous Segment</span></div>"
-  + "<div class='col-sm-6 text-center'><span id='nextSeg' class='greyed-out'>&nbsp;Next Segment&nbsp;▶</span></div><hr>"
+  + "<div class='col-sm-5 text-center'><span id='prevSeg' class='btn btn-sm btn-xs btn-outline-secondary disabled noPointer'>◀&nbsp;Previous Segment</span></div>"
+  + "<div class='col-sm-2 text-center'><span id='newSeg' class='btn btn-sm btn-xs btn-outline-primary'>New Query</span></div>"
+  + "<div class='col-sm-5 text-center'><span id='nextSeg' class='btn btn-sm btn-xs btn-outline-secondary disabled noPointer'>&nbsp;Next Segment&nbsp;▶</span></div><hr>"
 
   + "<div class='col-sm-12 text-center'><h4>Save &amp; Load</h4></div>"
-  + "<div class='col-sm-6 text-center'><span id='saveButton' class='textNav'>Save</span></div>"
-  + "<div class='col-sm-6 text-center'><span id='loadButton' class='textNav'>Load</span></div><hr>"
+  + "<div class='col-sm-1'></div>"
+  + "<div class='col-sm-4 text-center'><span id='saveButton' class='btn btn-sm btn-xs btn-outline-primary btn-block'>Save</span></div>"
+  + "<div class='col-sm-2 '></div>"
+  + "<div class='col-sm-4 text-center'><span id='loadButton' class='btn btn-sm btn-xs btn-outline-primary btn-block'>Load</span></div><hr>"
+  + "<div class='col-sm-1'></div>"
+
   + "</div>";
 
   /**
@@ -103,7 +108,9 @@ var andromeda = {
           //get a link to the current page from the result and save it in the global andromeda environment object
           var currentLink = jResult.find('.current').filter(':last').get(0);
           _a.environment.text.doc = TEXT_LOAD_URL + $(currentLink).attr('href');
-          _a.environment.text.title = $(jResult.find('#header_text').get(0)).find('h1').get(0).textContent;
+          //get the title
+          var title = $(jResult.find('#header_text').get(0)).find('h1').get(0).textContent;
+          _a.environment.text.title = title.replace(/[\s]/g, ' ').replace(/\s\s+/g, ' ').trim();
           //get the prev and next segment
           var nextArrow = jResult.find('.arrow span[alt="next"]').get(0);
           var prevArrow = jResult.find('.arrow span[alt="previous"]').get(0);
@@ -307,6 +314,8 @@ var andromeda = {
     }
     //add the created blurb to the to-add object
     toAdd.blurb = blurb;
+    //only set the note type if event is not undefined. DictNotes have no event (undefined);
+    if(event != undefined) toAdd.type = 'user';
 
     //add it to the displayed data
     loadNoteDisplay(toAdd);
@@ -317,10 +326,24 @@ var andromeda = {
    *
    */
   var loadNoteDisplay = function(note){
-    //set the id of the note to the length of the array
-    note.id = _a.environment.note.all.length;
-    //also save it in the environment variables
-    _a.environment.note.all.push(note);
+    //only set its id and add it to the list if it hasnt been added yet
+    if(_a.environment.note.all.indexOf(note) == -1){
+      //set the id of the note to the first free id
+      note.id = -1;
+      while(true){
+        note.id ++;
+        var matchFound = false;
+        $.each(_a.environment.note.all, function(i, n){
+          if(note.id == n.id){
+            matchFound = true;
+            return false;
+          }
+        });
+        if(!matchFound) break;
+      }
+      //also save it in the environment variables
+      _a.environment.note.all.push(note);
+    }
     //start analysing the locus to discover where it needs to be added
     var pointPart = note.locus.replace(/ /g, '_').split('.');
     var locusParts = pointPart[0].split(',_');
@@ -402,7 +425,6 @@ var andromeda = {
       + '</div><div class="noteData">'
       + note.data + '</div></div>'
     );
-
     //if the noteHolder is collapsed that we're adding to, uncollapse it
     var collapseBut = $('#' + noteHolderId).find('.collapseButton');
     if(collapseBut.text() == '▶'){
@@ -417,10 +439,56 @@ var andromeda = {
         //stop the content editing on enter press
         $(this).keydown(function(event){
           if(event.keyCode == 13 && !event.shiftKey){
+            //update the contents of the note, first retrieve the parent note id
+            var noteId = $(this).parent().attr('note-id');
+            var i, max = _a.environment.note.all.length, note;
+            for(i = 0; i < max; i++){
+              if(_a.environment.note.all[i].id == noteId){
+                _a.environment.note.all[i].data = $(this).html();
+              }
+            }
             $(this).attr('contenteditable', 'false');
           }
         });
+
+        //On loss of focus, revert the changes
+        $(this).unbind('focusout').focusout(function(event){
+            //stop the contented allowing to be edited
+            $(this).attr('contenteditable', 'false');
+            //get the note id of the containing note
+            var noteId = $(this).parent().attr('note-id');
+            var i, max = _a.environment.note.all.length, note;
+            for(i = 0; i < max; i++){
+              if(_a.environment.note.all[i].id == noteId){
+                //if this is the matching data object, reloa the data
+                 $(this).html(_a.environment.note.all[i].data);
+              }
+            }
+        });
     });
+    //if the just added note was a dict note, don't trigger a click and focus
+    console.log(note.type);
+    if(note.type == 'dict') return;
+
+    //find the note div back and click its note-data div to begin editing
+    $('#' + noteHolderId).find('div[note-id="' + note.id + '"]').find('.noteData').click(); //trigger click to allow contenteditable
+    setTimeout(function(){
+      //focus using the native JS method. JQuery does not work for some reason.
+      var noteDataEl = $('#' + noteHolderId).find('div[note-id="' + note.id + '"]').find('.noteData').get(0);
+      noteDataEl.focus();
+      //then select the entire node (to be precise, only its contents);
+      if (document.selection) {
+            var range = document.body.createTextRange();
+            range.moveToElementText(noteDataEl);
+            range.select();
+        } else if (window.getSelection) {
+            var range = document.createRange();
+            range.selectNodeContents(noteDataEl);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+        }
+      //trigger only after 200ms. To allow the contenteditable click handler to be executed
+    }, 200);
   }
 
   /**
@@ -446,7 +514,7 @@ var andromeda = {
       n = _a.environment.note.all[i];
       if(n.id == noteId){
         //this is the element to remove. Remove it
-        _a.environment.splice(i, 0);
+        _a.environment.note.all.splice(i, 1);
       }
     }
   }
@@ -546,7 +614,7 @@ var andromeda = {
           //add the next and prev segment handlers
           if(_a.environment.text.next != undefined){
             var nextSeg = $(headerDropdown.find('#nextSeg').get(0));
-            nextSeg.addClass('textNav').removeClass('greyed-out');
+            nextSeg.addClass('btn-outline-primary').removeClass('btn-outline-secondary disabled noPointer');
             nextSeg.unbind('click').click(function(event){
               event.stopPropagation();
               nextSeg.html('Loading...');
@@ -555,7 +623,7 @@ var andromeda = {
           }
           if(_a.environment.text.prev != undefined){
             var prevSeg = $(headerDropdown.find('#prevSeg').get(0));
-            prevSeg.addClass('textNav').removeClass('greyed-out');
+            prevSeg.addClass('btn-outline-primary').removeClass('btn-outline-secondary disabled noPointers');
             prevSeg.unbind('click').click(function(event){
               event.stopPropagation();
               prevSeg.html('Loading...');
@@ -563,9 +631,15 @@ var andromeda = {
             });
           }
 
+          //bind the newSeg button
+          var newSeg = $(headerDropdown.find('#newSeg').get(0));
+          newSeg.unbind('click').click(function(){
+            
+          });
+
           //add the save and load click handlers
           headerDropdown.find('#saveButton').unbind('click').click(function(event){
-            _a.file.save('test.json');
+            _a.file.save(_a.environment.text.title + '.json');
           });
 
           //finally fade in the dropdown menu
@@ -721,6 +795,7 @@ var andromeda = {
     var lemmaDef = $(lemmaHeader).find('.lemma_definition').get(0);
 
     _a.environment.note.toAdd = {
+      type: 'dict',
       locus: _a.environment.dictionary.current.loc,
       text: _a.environment.dictionary.current.wordTitle,
       data: lemma.textContent + "&nbsp;=&nbsp;" + lemmaDef.textContent
@@ -950,7 +1025,7 @@ var andromeda = {
         //get the data from the event
         var data = event.currentTarget.result;
         //decode and parse the data as JSON
-        var env = JSON.parse(decodeURI(data));
+        var env = JSON.parse(decodeURI((data)));
         //remove all the greyed-out classes
         $('.greyed-out').removeClass('greyed-out');
         hideDropdown();
