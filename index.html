@@ -19,6 +19,22 @@
     <!-- Only shown when a selection is made -->
     <div id="addNote" onmousedown='andromeda.search.addNote(event)'>&#43; Add Note</div>
 
+    <!-- Only shown when a newSegment request is made -->
+    <div id='newSegDiv'>
+      <div id='newSegContent' class='col-sm-6'>
+        <div class='col-sm-12'>
+          <h4>Perseus Navigation</h4>
+          <p>Using the input box below you can navigate to a new section of this text or load a new text instantly.</p>
+          <p>Your current location is <span id="location"></span> which can be retrieved using the Perseus shortcut: <span id="perseusShortcut"><span></p>
+
+          <input id="newSegQuery" type="text" class="form-control" placeholder="Enter a name or a URL and press 'Load from Perseus'">
+          <input id="newSegQueryButton" type="submit" class="btn btn-block btn-primary" value="Load from Perseus">
+          <br>
+        </div>
+        <div class="col-sm-12"><span id='newSegCloseButton' class='btn btn-sm btn-outline-primary'>Close</span></div>
+      </div>
+    </div>
+
     <!-- Holds all the content -->
     <div id="contentRow" class="row">
 

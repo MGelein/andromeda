@@ -38,14 +38,15 @@ var andromeda = {
    * This function is called by the 'Load From Perseus Button'
    * It parses the UI query box and does some input sanitizing
    */
-  var searchPerseus = function(){
+  var searchPerseus = function(btn, field, startFromScratch){
+    if(startFromScratch == undefined) startFromScratch = true;
     //load the query from the UI and check its length
-    var query = $('#loadFromPerseusQuery').val().trim();
-    $('#loadFromPerseusQuery').val('');
+    var query = field.val().trim();
+    field.val('');
     if(query.length == 0) return;
 
     //show that we're loading from perseus
-    $('#loadFromPerseusButton').val('Loading...').removeClass('btn-primary').addClass('btn-warning');
+    btn.val('Loading...').removeClass('btn-primary').addClass('btn-warning');
 
     //decide what to do based on the input.
     //Either load the page, or forward the name to the search page
@@ -53,10 +54,11 @@ var andromeda = {
     if(!query.startsWith('http')){
       perseusUrl = SEARCH_URL +  encodeURI(query);
     }
-    //empty the note and dictionary content
-    $('#noteContent').html('');
-    $('#dictionaryContent').html('');
-
+    //empty the note and dictionary content only if we're loading a new text
+    if(startFromScratch){
+      $('#noteContent').html('');
+      $('#dictionaryContent').html('');
+    }
     //start loading the actual text
     startLoadingText(perseusUrl);
   }
@@ -73,13 +75,23 @@ var andromeda = {
 
     //Start the asynchronous request
     $.ajax({url: perseusUrl, success: function(result){
+        //first try to fadeout the newSegDiv if it wasn't already faded
         //If the entered query was ambiguous or not a perseus URL
         if(result.indexOf('<title>Perseus Search results</title>') != -1 || result.indexOf('<link href="/js/perseusld/perseusld.css" rel="stylesheet" type="text/css"/>') == -1){
-          $('#loadFromPerseusButton').val('Not A Known Text').removeClass('btn-warning').addClass('btn-danger');
+            var newSegBut = $('#newSegDiv').find('#newSegQueryButton');
+            newSegBut.val('Not A Know Text').removeClass('btn-warning').addClass('btn-danger');
+            $('#loadFromPerseusButton').val('Not A Known Text').removeClass('btn-warning').addClass('btn-danger');
+
           setTimeout(function(){
+            newSegBut.val('Load From Perseus').removeClass('btn-danger').addClass('btn-primary');
             $('#loadFromPerseusButton').val('Load From Perseus').removeClass('btn-danger').addClass('btn-primary');
           }, 2000);
         }else{
+          //we are now sure to be able to fade out hte new seg div
+          $($('#newSegDiv').fadeOut()).promise().done(function(){
+            var newSegBut = $('#newSegDiv').find('#newSegQueryButton');
+            newSegBut.val('Load From Perseus').removeClass('btn-warning').addClass('btn-primary');
+          });
           //remove image links to prevent them from generating errors
           //result = result.replace(/<img[^>]*>/g,"");
           //Instead of removing, replace all img with span to prevent the src from firing
@@ -104,6 +116,9 @@ var andromeda = {
           });
           //take of the first two characters;
           _a.environment.text.locus = _a.environment.text.locus.substr(2);
+
+          //get the name of the perseus shortcut
+          _a.environment.text.shortcut = jResult.find('#header_jump_form > input[name="doc"]').val();
 
           //get a link to the current page from the result and save it in the global andromeda environment object
           var currentLink = jResult.find('.current').filter(':last').get(0);
@@ -634,7 +649,40 @@ var andromeda = {
           //bind the newSeg button
           var newSeg = $(headerDropdown.find('#newSeg').get(0));
           newSeg.unbind('click').click(function(){
-            
+            var newSegDiv = $('#newSegDiv');
+            newSegDiv.fadeIn();
+            //the locus of the current text
+            newSegDiv.find('#location').text(_a.environment.text.title + ' ' +  _a.environment.text.locus);
+            //the shortcut to the current text
+            newSegDiv.find('#perseusShortcut').text(_a.environment.text.shortcut);
+
+            //make the close handler
+            newSegDiv.find('#newSegCloseButton').unbind('click').click(function(){
+              newSegDiv.fadeOut();
+            });
+
+            //make the newSegContent consume all the events to prevent the newSegDiv from fading out on every click
+            newSegDiv.find('#newSegContent').unbind('click').click(function(event){
+              event.stopPropagation();
+            });
+
+            //if you click outside of the content, remove the query field
+            newSegDiv.unbind('click').click(function(){
+              newSegDiv.fadeOut();
+            });
+
+            //enter press load
+            newSegDiv.find('#newSegQuery').unbind('keydown').keydown(function(event){
+              if(event.keyCode == 13){
+                searchPerseus($('#newSegQueryButton'), $('#newSegQuery'), false);
+              }
+            });
+            //button click load
+            newSegDiv.find('#newSegQueryButton').unbind('click').click(function(){
+              searchPerseus($('#newSegQueryButton'), $('#newSegQuery'), false);
+            });
+            //focus the caret in the textField
+            newSegDiv.find('#newSegQuery').focus();
           });
 
           //add the save and load click handlers
@@ -934,12 +982,12 @@ var andromeda = {
   var registerClickHandlers = function(){
     //Click handler of the Load From Perseus Button
     $('#loadFromPerseusButton').click(function(){
-      andromeda.search.perseus();
+      searchPerseus($('#loadFromPerseusButton'), $('#loadFromPerseusQuery'));
     });
 
     $('#loadFromPerseusQuery').keydown(function(e){
         if(e.keyCode == 13){
-          searchPerseus();
+          searchPerseus($('#loadFromPerseusButton'), $('#loadFromPerseusQuery'));
         }
     });
 
@@ -1071,4 +1119,5 @@ $(document).ready(function(){
   andromeda.ui.registerClickHandlers();
   $('#headerDropdown').hide();
   $('#addNote').hide();
+  $('#newSegDiv').hide();
 });
