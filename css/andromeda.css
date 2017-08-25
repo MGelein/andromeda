@@ -233,10 +233,11 @@ body{
 }
 
 #dictionaryCell{
-  height: 49vh;
+  height: 48vh;
+  margin-bottom: 1vh;
 }
 
 #noteCell{
-  height: 48vh;
+  height: 49vh;
   margin-top: 1vh;
 }

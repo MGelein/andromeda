@@ -23,7 +23,10 @@ var andromeda = {
   + "<div class='col-sm-12 text-center'><h4>Navigation</h4></div>"
   + "<div class='col-sm-6 text-center'><span id='prevSeg' class='greyed-out'>◀&nbsp;Previous Segment</span></div>"
   + "<div class='col-sm-6 text-center'><span id='nextSeg' class='greyed-out'>&nbsp;Next Segment&nbsp;▶</span></div><hr>"
+
   + "<div class='col-sm-12 text-center'><h4>Save &amp; Load</h4></div>"
+  + "<div class='col-sm-6 text-center'><span id='saveButton' class='textNav'>Save</span></div>"
+  + "<div class='col-sm-6 text-center'><span id='loadButton' class='textNav'>Load</span></div><hr>"
   + "</div>";
 
   /**
@@ -314,6 +317,11 @@ var andromeda = {
    *
    */
   var loadNoteDisplay = function(note){
+    //set the id of the note to the length of the array
+    note.id = _a.environment.note.all.length;
+    //also save it in the environment variables
+    _a.environment.note.all.push(note);
+    //start analysing the locus to discover where it needs to be added
     var pointPart = note.locus.replace(/ /g, '_').split('.');
     var locusParts = pointPart[0].split(',_');
     //if there was a point part
@@ -329,10 +337,10 @@ var andromeda = {
           if($('#noteContent').find('#note-' + part).length == 0){
             $('#noteContent').append(
               '<div class="topLevel" id="note-' + part + '">'
-              + '<span class="collapseButton">▼</span><h5>'
+              + '<span class="collapseButton text-primary">▼</span><h5>'
               + part.replace('_', ' ') + '</h5>'
               +'</div>'
-            );//▶
+            );
 
             //sort the top level divs
             $('#noteContent').find('.topLevel').sort(function(a, b){
@@ -345,7 +353,7 @@ var andromeda = {
           if($('#noteContent').find('#note-' + locusParts[0] + '-' + part).length == 0){
             $('#noteContent').find('#note-' + locusParts[0]).append(
               '<div class="' + secondLevelClass + '" id="note-' + locusParts[0] + '-' + part + '"><span class="level2Name">'
-              + part.replace('_', ' ') + '</span><span class="collapseButton">▼</span></div>'
+              + part.replace('_', ' ') + '</span><span class="collapseButton text-primary">▼</span></div>'
             );
 
             //sort the second level divs
@@ -359,7 +367,7 @@ var andromeda = {
           if($('#noteContent').find('#note-' + locusParts[0] + '-' + locusParts[1] + '-' + part).length == 0){
             $('#noteContent').find('#note-' + locusParts[0] + '-' + locusParts[1]).append(
               '<div class="thirdLevel" id="note-' + locusParts[0] + '-' + locusParts[1] + '-' + part + '"><span class="level3Name">'
-              + part.replace('_', '') + '</span><span class="collapseButton">▼</span></div>'
+              + part.replace('_', '') + '</span><span class="collapseButton text-primary">▼</span></div>'
             );
 
             //sort the third level divs
@@ -388,7 +396,7 @@ var andromeda = {
       note.data = "[Click To Edit]";
     }
     $('#' + noteHolderId).append(
-      '<div class="note"><div class="noteLemma">'
+      '<div class="note" note-id="' + note.id + '"><div class="noteLemma">'
       + note.blurb +  '&nbsp;:&nbsp;'
       + '<button class="float-right btn btn-outline-primary btn-sm btn-xs removeNoteButton" onclick="andromeda.search.removeNote(this)">✖</button>'
       + '</div><div class="noteData">'
@@ -422,6 +430,8 @@ var andromeda = {
   var removeNote = function(btn){
     //first get a ref to the note that holds the button
     var note = $(btn).parent().parent();
+    //get the note-id of this note
+    var noteId = note.attr('note-id');
     //check if the parent of this note contains other notes that the one we're removing
     //also implement a failsafe to prevent it deleting every div up to the document root. Stop at '#noteContent'
     while(note.parent().find('.note').length == 1 && note.parent().attr('id') != 'noteContent'){
@@ -429,6 +439,16 @@ var andromeda = {
     }
     //finally remove the content
     note.fadeOut().promise().done(function(){this.remove();});
+
+    //now also remove the note from the environment array, go through all of them, find the matching one and remove it
+    var i = 0; var max = _a.environment.note.all.length; var n;
+    for(i = 0; i < max; i++){
+      n = _a.environment.note.all[i];
+      if(n.id == noteId){
+        //this is the element to remove. Remove it
+        _a.environment.splice(i, 0);
+      }
+    }
   }
 
   /**
@@ -543,6 +563,11 @@ var andromeda = {
             });
           }
 
+          //add the save and load click handlers
+          headerDropdown.find('#saveButton').unbind('click').click(function(event){
+            _a.file.save('test.json');
+          });
+
           //finally fade in the dropdown menu
           headerDropdown.fadeIn();
         }else{
@@ -555,120 +580,132 @@ var andromeda = {
   /**
    * Just loads the word
    */
-  var loadWord = function(html, title, loc){
-    _a.environment.dictionary.current = {
-      text: title,
-      locus: loc,
-      data: ''
-    };
-    $('#dictionaryHeader').html('Dictionary: <span class="dictLemma">' + title + '</span> <span class="locus">' + loc + '</span>');
-    $('#dictionaryContent').html(html);
+  var loadWord = function(word){
+    _a.environment.dictionary.current = word;
+    $('#dictionaryHeader').html('Dictionary: <span class="dictLemma">' + word.wordTitle + '</span> <span class="locus">' + word.loc + '</span>');
+    $('#dictionaryContent').html(word.data);
+  }
+
+  /**
+   * Reloads the dictionary from cache
+   */
+  var loadDictionaryCache = function(){
+    //quickly save the one that was showing when saved
+    var word = _a.environment.dictionary.current;
+    //now load them all back
+    $.each(_a.environment.dictionary.cache, function(index, word){
+      //true flag means to ignore the cache
+      loadDictionaryPerseus(word.wordUrl.replace(MORPH_URL, ''), word.wordTitle, word.loc, true);
+    });
+    //finally show the one that was previously showing
+    loadWord(word);
   }
 
   /**
    * Loads a dictionary definition from perseus dictionary
    */
-  var loadDictionaryPerseus = function(url, title, locus){
+  var loadDictionaryPerseus = function(url, title, locus, ignoreCache){
     //construct the link
     var morphUrl = MORPH_URL + url;
+    //explicitly set it to false if not defined
+    if(ignoreCache == undefined) ignoreCache = false;
 
     //before loading the remote data, check if it is already cached
     var cached = false;
     $.each(_a.environment.dictionary.cache, function(index, word){
       if(word.wordUrl == morphUrl){
-         loadWord(word.data, word.wordTitle, word.loc);
+         loadWord(word);
          cached = true;
        }
     });
     //if we used the cached version, stop right here
-    if(cached) return;
+    if(cached && !ignoreCache) return;
 
-    //Start loading the word asynchronously
-    $.ajax({url: morphUrl, success: function(result){
-      //remove image links to prevent them from generating errors
-      result = result.replace(/<img[^>]*>/g,"");
+    if(!cached){
+      //Start loading the word asynchronously
+      $.ajax({url: morphUrl, success: function(result){
+        //remove image links to prevent them from generating errors
+        result = result.replace(/<img[^>]*>/g,"");
 
-      //Take only the main column from the result page
-      var mainColumn = $(result).find('#main_col').get(0);
-      $('#dictionaryContent').html(mainColumn.innerHTML);
-      $('#dictionaryContent table').addClass('table table-sm table-striped');
+        //Take only the main column from the result page
+        var mainColumn = $(result).find('#main_col').get(0);
+        $('#dictionaryContent').html(mainColumn.innerHTML);
+        $('#dictionaryContent table').addClass('table table-sm table-striped');
 
-      //add the add to notes button
-      var addToNoteButton = "<button class='btn btn-sm btn-outline-primary btn-xs' onclick='andromeda.search.addDictNote(event, this)'>+Notes</button>";
-      $('#dictionaryContent .lemma_header').append(addToNoteButton);
-      //for now remove the word frequency statistics
-      $('#dictionaryContent .word_freq').remove();
-      //Move all lexica links to the end of the lemma
-      $('#dictionaryContent a[href="#lexicon"]').each(function(index, value){
-        $(value).closest('.lemma').append(value);
-        $(value).addClass('btn btn-primary btn-sm btn-xs lexLink');
-        //overwrite any old click behaviour
-        $(value).removeAttr('onclick');
-        $(value).prop('onclick', null);
-        //reset the href attribute
-        $(value).attr('href', '#');
-        //remove '-link' from the id so it can be used from hereonout
-        var id = $(value).attr('id');
-        $(value).attr('id', id.substr(0, id.length - 5));
-      });
-      $('#dictionaryContent p').remove();
-      //If there was no result, at least display that
-      if($('#dictionaryContent').html().trim().length == 0){
-        $('#dictionaryContent').html("<h3>Sorry!</h3><p>It looks like no result could be found for that word.</p>");
-      }
-
-      //Handle the click of the lexicon request button
-      $("#dictionaryContent").find('.lexLink').attr('onclick', 'andromeda.search.loadLexicon(event, this);');
-
-      //show the word
-      loadWord($('#dictionaryContent').html(), title, locus);
-
-      //cache this specific word
-      cacheDictWord(title, $('#dictionaryContent').html(), morphUrl, locus);
-
-
-      //re-add the listener for the header
-      $('#dictionaryHeader').unbind('click').click(function(event){
-        //prevent the event from bubbling
-        event.stopPropagation();
-        var headerDropdown = $('#headerDropdown')
-        if(!_a.ui.dropdownShowing){
-          _a.ui.dropdownShowing = true;
-          var positionDropdown = function(){
-            var dictHeader = $('#dictionaryHeader');
-            var offset = dictHeader.offset();
-            headerDropdown.offset({top: 0, left: 0});
-            headerDropdown.html(_a.environment.dictionary.dropdown);
-            headerDropdown.offset({top: offset.top + dictHeader.height() , left: offset.left});
-            headerDropdown.innerWidth(dictHeader.outerWidth());
-          }
-          positionDropdown();
-          //reposition on resize
-          $(window).unbind('resize').resize(positionDropdown);
-          //hide on click anywhere outside of the headerDropdown
-          $(document).click(function(){hideDropdown();});
-
-          //make the currently selected one different
-          headerDropdown.find('.dropdownLink').each(function(index, link){              //apparently there are multiple forms of space.... o.0
-            var dictHeaderText = $('#dictionaryHeader').text().replace('Dictionary:', '').trim().replace(' ', '').replace(' ', '');
-            var linkHeaderText = $(link).text().trim().replace(' ', '');
-            if(dictHeaderText != linkHeaderText) return;
-            $($(link).find('.dropdownIcon').get(0)).addClass('dropdownActiveIcon');
-          });
-
-          //finally fade in the dropdown menu
-          headerDropdown.fadeIn();
-
-          //attach click listeners to the dropdown
-          headerDropdown.find('.dropdownLink').click(function(event){
-            var cachedObj = _a.environment.dictionary.cache[$(this).attr('resultIndex')];
-            loadWord(cachedObj.data, cachedObj.wordTitle, cachedObj.loc);
-          });
-        }else{
-          hideDropdown();
+        //add the add to notes button
+        var addToNoteButton = "<button class='btn btn-sm btn-outline-primary btn-xs' onclick='andromeda.search.addDictNote(event, this)'>+Notes</button>";
+        $('#dictionaryContent .lemma_header').append(addToNoteButton);
+        //for now remove the word frequency statistics
+        $('#dictionaryContent .word_freq').remove();
+        //Move all lexica links to the end of the lemma
+        $('#dictionaryContent a[href="#lexicon"]').each(function(index, value){
+          $(value).closest('.lemma').append(value);
+          $(value).addClass('btn btn-primary btn-sm btn-xs lexLink');
+          //overwrite any old click behaviour
+          $(value).removeAttr('onclick');
+          $(value).prop('onclick', null);
+          //reset the href attribute
+          $(value).attr('href', '#');
+          //remove '-link' from the id so it can be used from hereonout
+          var id = $(value).attr('id');
+          $(value).attr('id', id.substr(0, id.length - 5));
+        });
+        $('#dictionaryContent p').remove();
+        //If there was no result, at least display that
+        if($('#dictionaryContent').html().trim().length == 0){
+          $('#dictionaryContent').html("<h3>Sorry!</h3><p>It looks like no result could be found for that word.</p>");
         }
-      });
-    }});
+
+        //Handle the click of the lexicon request button
+        $("#dictionaryContent").find('.lexLink').attr('onclick', 'andromeda.search.loadLexicon(event, this);');
+
+        //cache this specific word
+        cacheDictWord(title, $('#dictionaryContent').html(), morphUrl, locus);
+        //show the word last added
+        loadWord(_a.environment.dictionary.cache[0]);
+      }});
+    }
+    //re-add the listener for the header
+    $('#dictionaryHeader').unbind('click').click(function(event){
+      //prevent the event from bubbling
+      event.stopPropagation();
+      var headerDropdown = $('#headerDropdown')
+      if(!_a.ui.dropdownShowing){
+        _a.ui.dropdownShowing = true;
+        var positionDropdown = function(){
+          var dictHeader = $('#dictionaryHeader');
+          var offset = dictHeader.offset();
+          headerDropdown.offset({top: 0, left: 0});
+          headerDropdown.html(_a.environment.dictionary.dropdown);
+          headerDropdown.offset({top: offset.top + dictHeader.height() , left: offset.left});
+          headerDropdown.innerWidth(dictHeader.outerWidth());
+        }
+        positionDropdown();
+        //reposition on resize
+        $(window).unbind('resize').resize(positionDropdown);
+        //hide on click anywhere outside of the headerDropdown
+        $(document).click(function(){hideDropdown();});
+
+        //make the currently selected one different
+        headerDropdown.find('.dropdownLink').each(function(index, link){              //apparently there are multiple forms of space.... o.0
+          var dictHeaderText = $('#dictionaryHeader').text().replace('Dictionary:', '').trim().replace(' ', '').replace(' ', '');
+          var linkHeaderText = $(link).text().trim().replace(' ', '');
+          if(dictHeaderText != linkHeaderText) return;
+          $($(link).find('.dropdownIcon').get(0)).addClass('dropdownActiveIcon');
+        });
+
+        //finally fade in the dropdown menu
+        headerDropdown.fadeIn();
+
+        //attach click listeners to the dropdown
+        headerDropdown.find('.dropdownLink').click(function(event){
+          var cachedObj = _a.environment.dictionary.cache[$(this).attr('resultIndex')];
+          loadWord(cachedObj);
+        });
+      }else{
+        hideDropdown();
+      }
+    });
   }
 
   /**
@@ -684,8 +721,8 @@ var andromeda = {
     var lemmaDef = $(lemmaHeader).find('.lemma_definition').get(0);
 
     _a.environment.note.toAdd = {
-      locus: _a.environment.dictionary.current.locus,
-      text: _a.environment.dictionary.current.text,
+      locus: _a.environment.dictionary.current.loc,
+      text: _a.environment.dictionary.current.wordTitle,
       data: lemma.textContent + "&nbsp;=&nbsp;" + lemmaDef.textContent
     };
 
@@ -709,7 +746,7 @@ var andromeda = {
     var cached = false;
     $.each(_a.environment.dictionary.cache, function(index, word){
       if(word.wordUrl == lexiconUrl){
-        loadWord(word.data, word.wordTitle, word.loc);
+        loadWord(word);
         cached = true;
        }
     });
@@ -717,7 +754,8 @@ var andromeda = {
 
     $.ajax({url: lexiconUrl, success: function(result){
       cacheDictWord(wordTitle, result, lexiconUrl, '');
-      loadWord(result, wordTitle, '');
+      //show the word that has been added last
+      loadWord(_a.environment.dictionary.cache[0]);
     }});
   }
 
@@ -737,6 +775,14 @@ var andromeda = {
     _a.environment.dictionary.cache.unshift(cache);
     //if we have too many cached, remove the oldest one
     if(_a.environment.dictionary.cache.length > DICT_CACHE_SIZE) _a.environment.dictionary.cache.pop();
+    recreateDictHeader();
+  }
+
+  /**
+   * Recreates the dictionary header data from the cache
+   * @return {[type]} [description]
+   */
+  var recreateDictHeader = function(){
     //recreate the data to display on header click
     _a.environment.dictionary.dropdown = '';
     $.each(_a.environment.dictionary.cache, function(index, word){
@@ -821,6 +867,10 @@ var andromeda = {
           searchPerseus();
         }
     });
+
+    $('#loadFromFileButton').change(function(event){
+        _a.file.load(event.target.files[0]);
+    });
   }
 
   _a.util = {
@@ -870,6 +920,61 @@ var andromeda = {
     registerClickHandlers: registerClickHandlers,
     dropdownShowing: false
   };
+
+  _a.file = {
+    /**
+    This method takes care of the actual downloading of the file
+
+    @method save
+    @param {String} fileName  the fileName of the file to be saved
+    **/
+    save: function createFileDownloadLink(fileName){
+      var href = "data:text/json;charset=utf-8," + encodeURI(JSON.stringify(_a.environment));
+      var link = document.createElement("a");
+      link.download = fileName;
+      link.href = href;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      $(link).remove();
+    },
+
+    /**
+     * Called when we load a file
+     * @param {File} file the file to load
+     */
+    load: function(file){
+      //instantiate the fileReader.
+      var reader = new FileReader();
+      reader.onload = (function(event){
+        //get the data from the event
+        var data = event.currentTarget.result;
+        //decode and parse the data as JSON
+        var env = JSON.parse(decodeURI(data));
+        //remove all the greyed-out classes
+        $('.greyed-out').removeClass('greyed-out');
+        hideDropdown();
+
+        //set the env variables
+        _a.environment = env;
+        //start loading all the stuff back into memory
+        loadText();
+        loadTranslations();
+        //empty the note and dictionary content
+        $('#noteContent').html('');
+        $('#dictionaryContent').html('');
+        //reload all the notes
+        $.each(_a.environment.note.all, function(index, note){
+            _a.environment.note.toAdd = note;
+            addNewNote();
+        });
+        //reload the dict
+        loadDictionaryCache();
+      });
+      //we only care about the first file. Should be the only file available to select
+      reader.readAsText(file);
+    }
+  }
 
   _a.environment = {
     text: {},
