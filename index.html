@@ -37,7 +37,7 @@
     <div id="headerDropdown">DROPDOWN</div>
 
     <!-- Only shown when a selection is made -->
-    <div id="addNote" onmousedown='andromeda.search.addNote(event)'>&#43; Add Note</div>
+    <div id="addNote" onmousedown='andromeda.ext.addNote(event)'>&#43; Add Note</div>
 
     <!-- Only shown when a newSegment request is made -->
     <div id='newSegDiv'>
@@ -144,6 +144,18 @@
 
     <!-- All script includes -->
     <script src="js/lib/jquery-3.2.1.min.js"></script>
-    <script src="js/andromeda.js"></script>
+    <!-- Load scripts in correct order -->
+    <script src="dist/event.js"></script>
+    <script src="dist/translation.js"></script>
+    <script src="dist/text.js"></script>
+    <script src="dist/note.js"></script>
+    <script src="dist/file.js"></script>
+    <script src="dist/ext.js"></script>
+    <script src="dist/environment.js"></script>
+    <script src="dist/dropdown.js"></script>    
+    <script src="dist/dictionary.js"></script>
+    <script src="dist/ui.js"></script>
+    <script src="dist/util.js"></script>
+    <script src="dist/andromeda.js"></script>
   </body>
 </html>
