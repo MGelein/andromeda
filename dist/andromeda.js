@@ -11,11 +11,11 @@ var Andromeda = (function () {
     }
     return Andromeda;
 }());
-var andromeda = new Andromeda(0.5, 'Mees Gelein');
+var andromeda = new Andromeda(0.7, 'Mees Gelein');
 (function (_a) {
-    var TEXT_LOAD_URL = "http://www.perseus.tufts.edu/hopper/loadquery";
-    var SEARCH_URL = "http://www.perseus.tufts.edu/hopper/searchresults?q=";
-    var MORPH_URL = "http://www.perseus.tufts.edu/hopper/";
+    var TEXT_LOAD_URL = "loadquery/index.php";
+    var SEARCH_URL = "search/index.php?q=";
+    var MORPH_URL = "";
     var DICT_CACHE_SIZE = 10;
     var textDropdownHTML = "<div class='row'><hr>"
         + "<div class='col-sm-12 text-center'><h4>Navigation</h4></div>"

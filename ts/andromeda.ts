@@ -31,15 +31,15 @@ class Andromeda{
  * Global access object
  * @type {Object}
  */
-var andromeda : Andromeda = new Andromeda(0.5, 'Mees Gelein');
+var andromeda : Andromeda = new Andromeda(0.7, 'Mees Gelein');
 
 /**
  * Anonymous namespace function
  */
 (function(_a : Andromeda){
-  const TEXT_LOAD_URL:string = "http://www.perseus.tufts.edu/hopper/loadquery";
-  const SEARCH_URL:string = "http://www.perseus.tufts.edu/hopper/searchresults?q=";
-  const MORPH_URL:string = "http://www.perseus.tufts.edu/hopper/";
+  const TEXT_LOAD_URL:string = "loadquery/index.php";
+  const SEARCH_URL:string = "search/index.php?q=";
+  const MORPH_URL:string = "";
   const DICT_CACHE_SIZE:number = 10;
 
   //contains the HTML for the text dropdown. Just saved in a variable to not pollute the code
@@ -389,7 +389,7 @@ var andromeda : Andromeda = new Andromeda(0.5, 'Mees Gelein');
             );
 
             //sort the top level divs
-            $('#noteContent').find('.topLevel').sort(function(a, b){
+            ($('#noteContent').find('.topLevel') as any).sort(function(a, b){
               var locA = $(a).find('h5').get(0).textContent;
               var locB = $(b).find('h5').get(0).textContent;
               return compareLoci(locA, locB);
@@ -403,7 +403,7 @@ var andromeda : Andromeda = new Andromeda(0.5, 'Mees Gelein');
             );
 
             //sort the second level divs
-            $('#note-' + locusParts[0]).find('.' + secondLevelClass).sort(function(a, b){
+            ($('#note-' + locusParts[0]).find('.' + secondLevelClass) as any).sort(function(a, b){
               var locA = $(a).find('.level2Name').get(0).textContent;
               var locB = $(b).find('.level2Name').get(0).textContent;
               return compareLoci(locA, locB);
@@ -417,7 +417,7 @@ var andromeda : Andromeda = new Andromeda(0.5, 'Mees Gelein');
             );
 
             //sort the third level divs
-            $('#note-' + locusParts[0] + '-' + locusParts[1]).find('.thirdLevel').sort(function(a, b){
+            ($('#note-' + locusParts[0] + '-' + locusParts[1]).find('.thirdLevel') as any).sort(function(a, b){
               var locA = $(a).find('.level3Name').get(0).textContent;
               var locB = $(b).find('.level3Name').get(0).textContent;
               return compareLoci(locA, locB);
